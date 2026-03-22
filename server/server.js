@@ -1,47 +1,11 @@
 import WebSocket, { WebSocketServer } from "ws";
 import dotenv from "dotenv";
 import Groq from "groq-sdk";
-import say from "say";
+import http from "http";
 
 dotenv.config();
 
-// 🔊 STATE
-let isSpeaking = false;
-let isListening = true;
-
-// 🔊 SPEAK FUNCTION
-async function speak(text) {
-  if (isSpeaking) return;
-
-  isSpeaking = true;
-  isListening = false; // ❗ STOP listening to avoid echo
-
-  return new Promise((resolve) => {
-    say.speak(text, undefined, 1.0, (err) => {
-      if (err) {
-        console.error("TTS error:", err);
-      }
-
-      isSpeaking = false;
-      isListening = true; // ❗ RESUME listening
-      resolve();
-    });
-  });
-}
-
-// 🔥 STOP FUNCTION (BARGE-IN SAFE)
-function stopSpeaking() {
-  if (isSpeaking) {
-    say.stop();
-    isSpeaking = false;
-    isListening = true; // resume listening after stop
-    console.log("🛑 AI interrupted");
-  }
-}
-
-// ⚡ SERVER
-import http from "http";
-
+// ⚡ HTTP SERVER (required for Render)
 const server = http.createServer((req, res) => {
   res.writeHead(200);
   res.end("Voice AI server running");
@@ -76,26 +40,16 @@ wss.on("connection", (client) => {
   });
 
   deepgramSocket.on("message", async (data) => {
-    // ❗ Ignore mic input while AI is speaking (fix echo loop)
-    if (!isListening) return;
-
     const response = JSON.parse(data);
     const transcript = response.channel?.alternatives[0]?.transcript;
 
     if (!transcript) return;
 
-    // 🔥 BARGE-IN (only works when listening is enabled)
-    if (!response.is_final && isSpeaking) {
-      stopSpeaking();
-    }
-
-    // 🔹 Interim
     if (!response.is_final) {
       console.log("Interim:", transcript);
       return;
     }
 
-    // 🔹 Final
     if (transcript !== lastFinalTranscript) {
       lastFinalTranscript = transcript;
 
@@ -121,7 +75,8 @@ wss.on("connection", (client) => {
 
         console.log("AI:", reply);
 
-        await speak(reply);
+        // 🔥 SEND BACK TO CLIENT
+        client.send(JSON.stringify({ reply }));
       } catch (err) {
         console.error("Groq error:", err);
       }
@@ -139,4 +94,4 @@ wss.on("connection", (client) => {
   });
 });
 
-console.log("Server running on ws://localhost:3000");
+console.log("Server ready");

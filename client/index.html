@@ -9,6 +9,23 @@
     async function start() {
       socket = new WebSocket("wss://voice-ai-pipeline-2mhe.onrender.com");
 
+      socket.onopen = () => {
+        console.log("✅ Connected to server");
+      };
+
+      // 🔥 RECEIVE AI RESPONSE
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.reply) {
+          console.log("AI:", data.reply);
+
+          // 🔊 SPEAK IN BROWSER
+          const utterance = new SpeechSynthesisUtterance(data.reply);
+          speechSynthesis.speak(utterance);
+        }
+      };
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const audioContext = new AudioContext({ sampleRate: 16000 });
 
