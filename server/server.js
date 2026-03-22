@@ -5,16 +5,16 @@ import http from "http";
 
 dotenv.config();
 
-// ⚡ HTTP SERVER (required for Render)
+// 🌐 HTTP SERVER (Render requirement)
 const server = http.createServer((req, res) => {
   res.writeHead(200);
-  res.end("Voice AI server running");
+  res.end("Voice AI server running 🚀");
 });
 
 const wss = new WebSocketServer({ server });
 
 server.listen(3000, () => {
-  console.log("Server running on port 3000");
+  console.log("🚀 Server running on port 3000");
 });
 
 const groq = new Groq({
@@ -22,7 +22,7 @@ const groq = new Groq({
 });
 
 wss.on("connection", (client) => {
-  console.log("Client connected");
+  console.log("🟢 Client connected");
 
   let lastFinalTranscript = "";
 
@@ -36,50 +36,56 @@ wss.on("connection", (client) => {
   );
 
   deepgramSocket.on("open", () => {
-    console.log("Connected to Deepgram");
+    console.log("🎤 Connected to Deepgram");
   });
 
   deepgramSocket.on("message", async (data) => {
-    const response = JSON.parse(data);
-    const transcript = response.channel?.alternatives[0]?.transcript;
+    try {
+      const response = JSON.parse(data);
+      const transcript = response.channel?.alternatives[0]?.transcript;
 
-    if (!transcript) return;
+      if (!transcript) return;
 
-    if (!response.is_final) {
-      console.log("Interim:", transcript);
-      return;
-    }
+      // 🔹 Interim (optional debug)
+      if (!response.is_final) return;
 
-    if (transcript !== lastFinalTranscript) {
-      lastFinalTranscript = transcript;
+      // 🔹 Final transcript
+      if (transcript !== lastFinalTranscript) {
+        lastFinalTranscript = transcript;
 
-      console.log("User:", transcript);
+        console.log("👤 User:", transcript);
 
-      try {
-        const completion = await groq.chat.completions.create({
-          model: "llama-3.1-8b-instant",
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are a strict fitness coach. Give short, direct answers.",
-            },
-            {
-              role: "user",
-              content: transcript,
-            },
-          ],
-        });
+        // 🔥 Send USER text to frontend
+        client.send(JSON.stringify({ type: "user", text: transcript }));
 
-        const reply = completion.choices[0].message.content;
+        try {
+          const completion = await groq.chat.completions.create({
+            model: "llama-3.1-8b-instant",
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are a strict fitness coach. Give short, powerful, direct answers.",
+              },
+              {
+                role: "user",
+                content: transcript,
+              },
+            ],
+          });
 
-        console.log("AI:", reply);
+          const reply = completion.choices[0].message.content;
 
-        // 🔥 SEND BACK TO CLIENT
-        client.send(JSON.stringify({ reply }));
-      } catch (err) {
-        console.error("Groq error:", err);
+          console.log("🤖 AI:", reply);
+
+          // 🔥 Send AI reply to frontend
+          client.send(JSON.stringify({ type: "ai", text: reply }));
+        } catch (err) {
+          console.error("Groq error:", err);
+        }
       }
+    } catch (err) {
+      console.error("Deepgram parse error:", err);
     }
   });
 
@@ -90,8 +96,7 @@ wss.on("connection", (client) => {
   });
 
   client.on("close", () => {
+    console.log("🔴 Client disconnected");
     deepgramSocket.close();
   });
 });
-
-console.log("Server ready");

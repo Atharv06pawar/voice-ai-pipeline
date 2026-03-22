@@ -1,10 +1,66 @@
 <!DOCTYPE html>
 <html>
+<head>
+  <title>Voice AI Coach</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f0f0f;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+
+    button {
+      padding: 12px 24px;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      background: #00ff88;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+
+    #chat {
+      max-width: 600px;
+      margin: auto;
+      text-align: left;
+    }
+
+    .msg {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 10px;
+    }
+
+    .user {
+      background: #1e90ff;
+    }
+
+    .ai {
+      background: #333;
+    }
+  </style>
+</head>
+
 <body>
-  <button onclick="start()">Start</button>
+
+  <h1>🎤 Voice AI Fitness Coach</h1>
+  <button onclick="start()">Start Talking</button>
+
+  <div id="chat"></div>
 
   <script>
     let socket;
+    const chat = document.getElementById("chat");
+
+    function addMessage(text, type) {
+      const div = document.createElement("div");
+      div.className = `msg ${type}`;
+      div.innerHTML = `<b>${type === "user" ? "You" : "AI"}:</b> ${text}`;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
 
     async function start() {
       socket = new WebSocket("wss://voice-ai-pipeline-2mhe.onrender.com");
@@ -13,15 +69,22 @@
         console.log("✅ Connected to server");
       };
 
-      // 🔥 RECEIVE AI RESPONSE
       socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
 
-        if (data.reply) {
-          console.log("AI:", data.reply);
+        if (data.type === "user") {
+          addMessage(data.text, "user");
+        }
 
-          // 🔊 SPEAK IN BROWSER
-          const utterance = new SpeechSynthesisUtterance(data.reply);
+        if (data.type === "ai") {
+          addMessage(data.text, "ai");
+
+          // 🔊 Stop previous speech
+          speechSynthesis.cancel();
+
+          // 🔊 Speak AI
+          const utterance = new SpeechSynthesisUtterance(data.text);
+          utterance.rate = 1;
           speechSynthesis.speak(utterance);
         }
       };
@@ -49,5 +112,6 @@
       };
     }
   </script>
+
 </body>
 </html>
