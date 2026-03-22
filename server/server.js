@@ -40,7 +40,18 @@ function stopSpeaking() {
 }
 
 // ⚡ SERVER
-const wss = new WebSocketServer({ port: 3000 });
+import http from "http";
+
+const server = http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end("Voice AI server running");
+});
+
+const wss = new WebSocketServer({ server });
+
+server.listen(3000, () => {
+  console.log("Server running on port 3000");
+});
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,

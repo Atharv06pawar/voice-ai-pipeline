@@ -7,7 +7,7 @@
     let socket;
 
     async function start() {
-      socket = new WebSocket("ws://localhost:3000");
+      socket = new WebSocket("wss://voice-ai-pipeline-2mhe.onrender.com");
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const audioContext = new AudioContext({ sampleRate: 16000 });
