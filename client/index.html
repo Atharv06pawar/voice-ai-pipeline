@@ -1,24 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Voice AI Coach</title>
+  <title>Voice AI</title>
   <style>
     body {
-      font-family: Arial;
-      background: #0f0f0f;
+      background: #111;
       color: white;
+      font-family: Arial;
       text-align: center;
-      padding: 20px;
     }
 
     button {
-      padding: 12px 24px;
-      font-size: 18px;
-      border: none;
-      border-radius: 10px;
-      background: #00ff88;
+      padding: 10px 20px;
+      margin: 20px;
+      font-size: 16px;
       cursor: pointer;
-      margin-bottom: 20px;
     }
 
     #chat {
@@ -29,7 +25,7 @@
 
     .msg {
       padding: 10px;
-      margin: 10px 0;
+      margin: 10px;
       border-radius: 10px;
     }
 
@@ -45,8 +41,8 @@
 
 <body>
 
-  <h1>🎤 Voice AI Fitness Coach</h1>
-  <button onclick="start()">Start Talking</button>
+  <h2>🎤 Voice AI</h2>
+  <button onclick="start()">Start</button>
 
   <div id="chat"></div>
 
@@ -56,58 +52,56 @@
 
     function addMessage(text, type) {
       const div = document.createElement("div");
-      div.className = `msg ${type}`;
+      div.className = "msg " + type;
       div.innerHTML = `<b>${type === "user" ? "You" : "AI"}:</b> ${text}`;
       chat.appendChild(div);
-      chat.scrollTop = chat.scrollHeight;
     }
 
     async function start() {
       socket = new WebSocket("wss://voice-ai-pipeline-2mhe.onrender.com");
 
-      socket.onopen = () => {
-        console.log("✅ Connected to server");
+      // 🔥 WAIT FOR CONNECTION FIRST
+      socket.onopen = async () => {
+        console.log("✅ Connected");
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioContext = new AudioContext({ sampleRate: 16000 });
+
+        const source = audioContext.createMediaStreamSource(stream);
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+
+        processor.onaudioprocess = (e) => {
+          const input = e.inputBuffer.getChannelData(0);
+          const buffer = new Int16Array(input.length);
+
+          for (let i = 0; i < input.length; i++) {
+            buffer[i] = input[i] * 32767;
+          }
+
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(buffer);
+          }
+        };
       };
 
+      // 🔥 RECEIVE RESPONSE
       socket.onmessage = (event) => {
+        console.log("RAW:", event.data);
+
         const data = JSON.parse(event.data);
 
-        if (data.type === "user") {
-          addMessage(data.text, "user");
-        }
+        if (data.reply) {
+          addMessage(data.reply, "ai");
 
-        if (data.type === "ai") {
-          addMessage(data.text, "ai");
-
-          // 🔊 Stop previous speech
+          // 🔊 stop previous speech
           speechSynthesis.cancel();
 
-          // 🔊 Speak AI
-          const utterance = new SpeechSynthesisUtterance(data.text);
-          utterance.rate = 1;
+          // 🔊 speak
+          const utterance = new SpeechSynthesisUtterance(data.reply);
           speechSynthesis.speak(utterance);
-        }
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const audioContext = new AudioContext({ sampleRate: 16000 });
-
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-
-      source.connect(processor);
-      processor.connect(audioContext.destination);
-
-      processor.onaudioprocess = (e) => {
-        const input = e.inputBuffer.getChannelData(0);
-        const buffer = new Int16Array(input.length);
-
-        for (let i = 0; i < input.length; i++) {
-          buffer[i] = input[i] * 32767;
-        }
-
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.send(buffer);
         }
       };
     }

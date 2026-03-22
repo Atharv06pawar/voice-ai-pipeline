@@ -5,10 +5,10 @@ import http from "http";
 
 dotenv.config();
 
-// 🌐 HTTP SERVER (Render requirement)
+// 🌐 HTTP server (required for Render)
 const server = http.createServer((req, res) => {
   res.writeHead(200);
-  res.end("Voice AI server running 🚀");
+  res.end("Voice AI server running");
 });
 
 const wss = new WebSocketServer({ server });
@@ -46,17 +46,16 @@ wss.on("connection", (client) => {
 
       if (!transcript) return;
 
-      // 🔹 Interim (optional debug)
+      // Ignore interim
       if (!response.is_final) return;
 
-      // 🔹 Final transcript
       if (transcript !== lastFinalTranscript) {
         lastFinalTranscript = transcript;
 
         console.log("👤 User:", transcript);
 
-        // 🔥 Send USER text to frontend
-        client.send(JSON.stringify({ type: "user", text: transcript }));
+        // 🔥 Send user text (optional UI)
+        client.send(JSON.stringify({ user: transcript }));
 
         try {
           const completion = await groq.chat.completions.create({
@@ -65,7 +64,7 @@ wss.on("connection", (client) => {
               {
                 role: "system",
                 content:
-                  "You are a strict fitness coach. Give short, powerful, direct answers.",
+                  "You are a strict fitness coach. Give short, direct answers.",
               },
               {
                 role: "user",
@@ -79,13 +78,13 @@ wss.on("connection", (client) => {
           console.log("🤖 AI:", reply);
 
           // 🔥 Send AI reply to frontend
-          client.send(JSON.stringify({ type: "ai", text: reply }));
+          client.send(JSON.stringify({ reply }));
         } catch (err) {
-          console.error("Groq error:", err);
+          console.error("❌ Groq error:", err);
         }
       }
     } catch (err) {
-      console.error("Deepgram parse error:", err);
+      console.error("❌ Deepgram parse error:", err);
     }
   });
 
