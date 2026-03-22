@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Voice AI</title>
+  <style>
+    body {
+      background: #111;
+      color: white;
+      font-family: Arial;
+      text-align: center;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #chat {
+      max-width: 600px;
+      margin: auto;
+      text-align: left;
+    }
+
+    .msg {
+      padding: 10px;
+      margin: 10px;
+      border-radius: 10px;
+    }
+
+    .user {
+      background: #1e90ff;
+    }
+
+    .ai {
+      background: #333;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>🎤 Voice AI</h2>
+  <button onclick="start()">Start</button>
+
+  <div id="chat"></div>
+
+  <script>
+    let socket;
+    const chat = document.getElementById("chat");
+
+    function addMessage(text, type) {
+      const div = document.createElement("div");
+      div.className = "msg " + type;
+      div.innerHTML = `<b>${type === "user" ? "You" : "AI"}:</b> ${text}`;
+      chat.appendChild(div);
+    }
+
+    async function start() {
+      socket = new WebSocket("wss://voice-ai-pipeline-2mhe.onrender.com");
+
+      // 🔥 WAIT FOR CONNECTION FIRST
+      socket.onopen = async () => {
+        console.log("✅ Connected");
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioContext = new AudioContext({ sampleRate: 16000 });
+
+        const source = audioContext.createMediaStreamSource(stream);
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+
+        processor.onaudioprocess = (e) => {
+          const input = e.inputBuffer.getChannelData(0);
+          const buffer = new Int16Array(input.length);
+
+          for (let i = 0; i < input.length; i++) {
+            buffer[i] = input[i] * 32767;
+          }
+
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(buffer);
+          }
+        };
+      };
+
+      // 🔥 RECEIVE RESPONSE
+      socket.onmessage = (event) => {
+        console.log("RAW:", event.data);
+
+        const data = JSON.parse(event.data);
+
+        if (data.reply) {
+          addMessage(data.reply, "ai");
+
+          // 🔊 stop previous speech
+          speechSynthesis.cancel();
+
+          // 🔊 speak
+          const utterance = new SpeechSynthesisUtterance(data.reply);
+          speechSynthesis.speak(utterance);
+        }
+      };
+    }
+  </script>
+
+</body>
+</html>
